@@ -1,16 +1,14 @@
 import org.jetbrains.sbtidea.IntelliJPlatform.IdeaUltimate
-import org.jetbrains.sbtidea.JbrPlatform
 
-lazy val scala213           = "2.13.10"
-lazy val scalaPluginVersion = "2023.3.19"
+lazy val scala213           = "2.13.12"
+lazy val scalaPluginVersion = "2024.1.15"
 lazy val minorVersion       = "0"
 lazy val buildVersion       = sys.env.getOrElse("ZIO_INTELLIJ_BUILD_NUMBER", minorVersion)
-lazy val pluginVersion      = s"2023.3.1.$buildVersion"
+lazy val pluginVersion      = s"2024.1.0.$buildVersion"
 
 ThisBuild / intellijPluginName := "intellij-metals"
 ThisBuild / intellijPlatform := IdeaUltimate
-ThisBuild / intellijBuild := "2023.3.2"
-ThisBuild / jbrInfo := AutoJbr(explicitPlatform = Some(JbrPlatform.osx_aarch64))
+ThisBuild / intellijBuild := "241.14494.240"
 
 Global / intellijAttachSources := true
 
@@ -18,6 +16,21 @@ addCommandAlias("fmt", "scalafmtAll")
 addCommandAlias("check", "scalafmtCheckAll")
 
 (Global / javacOptions) := Seq("--release", "17")
+
+ThisBuild / scalacOptions ++= Seq(
+  "-explaintypes",
+  "-deprecation",
+  "-unchecked",
+  "-feature",
+  "-Xlint:serial",
+  "-Wunused",
+  "-Ymacro-annotations",
+  "-Xfatal-warnings",
+  "-Wconf:cat=unused:info",
+  "-language:implicitConversions",
+  "-language:reflectiveCalls",
+  "-language:existentials"
+)
 
 lazy val root =
   newProject("intellij-metals", file("."))

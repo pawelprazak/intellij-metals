@@ -2,7 +2,6 @@ package intellij.metals.settings
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components._
-import com.intellij.openapi.project.Project
 
 import scala.beans.BeanProperty
 

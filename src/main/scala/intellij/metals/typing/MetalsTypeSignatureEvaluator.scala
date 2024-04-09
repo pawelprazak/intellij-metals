@@ -1,8 +1,8 @@
 package intellij.metals.typing
 
 import com.intellij.openapi.project.Project
-import com.intellij.platform.lsp.api.LspServerManager
-import com.intellij.platform.lsp.impl.requests.LspHoverRequest
+import com.intellij.platform.lsp.api.{LspServer, LspServerManager}
+import com.intellij.platform.lsp.impl.LspServerImpl
 import com.intellij.platform.lsp.util.Lsp4jUtilKt
 import com.intellij.psi.{PsiElement, PsiNamedElement}
 import intellij.metals.MetalsLspServerProvider
@@ -11,16 +11,14 @@ import org.jetbrains.plugins.scala.extensions.PsiElementExt
 import org.jetbrains.plugins.scala.lang.macros.MacroDef
 import org.jetbrains.plugins.scala.lang.macros.evaluator.{MacroContext, ScalaMacroEvaluator}
 import org.jetbrains.plugins.scala.lang.psi.api.expr.{ScMethodCall, ScReferenceExpression}
-import org.jetbrains.plugins.scala.lang.psi.api.statements.ScFunctionDefinition
 import org.jetbrains.plugins.scala.lang.psi.impl.ScalaPsiElementFactory
 import org.jetbrains.plugins.scala.lang.psi.types.ScType
-import org.jetbrains.plugins.scala.worksheet.WorksheetUtils
 
+import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 final class MetalsTypeSignatureEvaluator(project: Project) extends ScalaMacroEvaluator(project) {
-  lazy val lsp = LspServerManager.getInstance(project)
-  val regex    = raw"""(?ms)(?<=<code class="language-scala">)(.*?)(?=</code>)""".r
+  val regex = raw"""(?ms)(?<=<code class="language-scala">)(.*?)(?=</code>)""".r
 
   override def checkMacro(element: PsiNamedElement, context: MacroContext): Option[ScType] =
     element match {
@@ -32,6 +30,9 @@ final class MetalsTypeSignatureEvaluator(project: Project) extends ScalaMacroEva
         super.checkMacro(element, context)
     }
 
+  private lazy val lsp = LspServerManager.getInstance(project)
+
+  @nowarn("cat=deprecation")
   private def resolveMacroType(m: PsiElement, context: MacroContext): Option[ScType] = {
     def extractMacroReference =
       context.place.children.collectFirst {
@@ -52,14 +53,13 @@ final class MetalsTypeSignatureEvaluator(project: Project) extends ScalaMacroEva
 
   private def requestHoverFromLsp(element: PsiElement) =
     for {
-      vf        <- element.containingVirtualFile
-      editor    <- WorksheetUtils.getSelectedTextEditor(project, vf)
-      lspServer <- lsp.getServersForProvider(classOf[MetalsLspServerProvider]).asScala.headOption
+      vf <- element.containingVirtualFile
+      lspServer <- lsp.getServersForProvider(classOf[MetalsLspServerProvider]).asScala.collectFirst {
+                     case lsp: LspServerImpl => lsp
+                   }
       hoverResponse <- Option(
-                         lspServer.getRequestExecutor.sendRequestSync(
-                           new LspHoverRequest(lspServer, vf, editor.getDocument, element.getTextOffset)
-                         )
+                         lspServer.getRequestExecutor
+                           .getHoverInformation(vf, element.getTextOffset, LspServer.DEFAULT_REQUEST_TIMEOUT_MS)
                        )
     } yield hoverResponse
-
 }
