@@ -16,7 +16,7 @@ import com.intellij.util.Consumer
 import com.intellij.util.messages.MessageBusConnection
 import intellij.metals.MetalsLspServerProvider
 import intellij.metals.server.LspServerUtils
-import intellij.metals.settings.{MetalsConfigurable, MetalsSettings}
+import intellij.metals.settings.{MetalsConfigurable, MetalsProjectSettings, MetalsSettings}
 import org.jetbrains.bsp.BspBundle
 import org.jetbrains.bsp.protocol.BspCommunicationService
 
@@ -38,17 +38,30 @@ final class MetalsStatusWidgetFactory extends StatusBarWidgetFactory {
       extends EditorBasedWidget(project)
       with FileEditorManagerListener
       with Consumer[MouseEvent] { self =>
-    private val icon: AtomicReference[Icon] = new AtomicReference[Icon](Icons.Metals)
 
     override def ID(): String = s"Metals LSP: ${project.getName}"
 
     override def getPresentation: StatusBarWidget.WidgetPresentation =
       new StatusBarWidget.IconPresentation {
-        override def getIcon: Icon = icon.get()
+        private def isMetalsEnabled = {
+            val settings = MetalsProjectSettings.getInstance(project)
+            settings.metalsEnabled
+        }
+
+        override def getIcon: Icon = {
+          isMetalsEnabled match {
+            case true  => Icons.Metals
+            case false => Icons.MetalsDisabled
+          }
+        }
 
         override def getTooltipText: String =
-          if (getIcon == Icons.Metals) s"Metals is running: ${project.getName}"
-          else "Metals is disconnected"
+          LspServerUtils.forProject(project) match {
+            case Some(_) => "Metals is running"
+            case None => "Metals is disconnected"
+          }
+
+
 
         override def getClickConsumer: Consumer[MouseEvent] = self
       }
@@ -84,12 +97,12 @@ final class MetalsStatusWidgetFactory extends StatusBarWidgetFactory {
             LspServerManagerImpl
               .getInstanceImpl(project)
               .startServersIfNeeded(classOf[MetalsLspServerProvider])
-            icon.set(Icons.Metals)
+            MetalsProjectSettings.getInstance(project).metalsEnabled = true
           case "Disconnect" =>
             LspServerManagerImpl
               .getInstanceImpl(project)
               .stopServers(classOf[MetalsLspServerProvider])
-            icon.set(Icons.MetalsDisabled)
+            MetalsProjectSettings.getInstance(project).metalsEnabled = false
         }
         WindowManager.getInstance.getStatusBar(project).updateWidget(ID())
       }
@@ -110,5 +123,3 @@ final class MetalsStatusWidgetFactory extends StatusBarWidgetFactory {
     }
   }
 }
-
-object MetalsStatusWidgetFactory {}
